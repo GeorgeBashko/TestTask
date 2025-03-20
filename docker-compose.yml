@@ -1,0 +1,55 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    environment:
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/postgres
+      - KC_DB_USERNAME=george
+      - KC_DB_PASSWORD=password
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_LOG_LEVEL=DEBUG
+      - KC_DB_SCHEMA=public
+      - KC_FEATURES=preview
+      - KC_IMPORT=/opt/keycloak/data/import/realm-export.json
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak-realms/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    depends_on:
+      postgres:
+          condition: service_healthy
+    command: ["start-dev", "--import-realm"]
+
+
+  postgres:
+    image: 'postgres'
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=george
+      - POSTGRES_PASSWORD=password
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "george" ]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+    ports:
+      - "5432:5432"
+    #volumes:
+      #- ./data/postgresql:/var/lib/postgresql/data
+
+  app:
+    image: 'rest-app'
+    environment:
+      - DB_USER=george
+      - DB_PASSWORD=password
+      - DB_URL=jdbc:postgresql://postgres:5432/postgres
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - keycloak
+      - postgres
+    command: [ "java", "-jar", "app.jar" ]
+
